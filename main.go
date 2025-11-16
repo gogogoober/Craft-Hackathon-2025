@@ -12,7 +12,7 @@ import (
 
 const (
 	// API endpoint from the documentation
-	BaseURL = "https://connect.craft.do/links/JwH02Yc5RGk/api/v1"
+	BaseURL = "https://connect.craft.do/links/3tXZdMX0EIe/api/v1"
 )
 
 // QueryRequest represents the incoming JSON payload
@@ -60,9 +60,39 @@ func handleCraftHackathon(w http.ResponseWriter, r *http.Request) {
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	fmt.Printf("[%s] Received query: %s\n", timestamp, req.Query)
 
+	// Create Craft API client
+	c := client.NewClient(BaseURL)
+
+	// Fetch the root document to get the actual root page ID
+	root, err := c.FetchBlocks("", 0, false)
+	if err != nil {
+		log.Printf("Error fetching root: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to fetch document: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Simply insert the query text as a block at the end of the document
+	insertReq := client.InsertRequest{
+		Markdown: req.Query,
+		Position: client.Position{
+			Position: "end",
+			PageID:   root.ID, // Use actual root page ID
+		},
+	}
+
+	insertedBlocks, err := c.InsertBlocks(insertReq)
+	if err != nil {
+		log.Printf("Error adding content: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to add content: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	blockID := insertedBlocks[0].ID
+	fmt.Printf("[%s] Added content to page %s with block ID: %s\n", timestamp, root.ID, blockID)
+
 	// Prepare success response
 	response := QueryResponse{
-		Status: "received",
+		Status: "created",
 		Query:  req.Query,
 	}
 
